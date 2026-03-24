@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
-import dynamic from "next/dynamic";
-
-// Force client-side rendering for Web3 components to prevent Next.js static export crashes on Vercel
-const Web3Provider = dynamic(() => import("./providers/Web3Provider"), { ssr: false });
+import Web3Provider from "./providers/Web3Provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
