@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
-import Web3Provider from "./providers/Web3Provider";
+import ClientProviders from "./providers/ClientProviders";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,10 +20,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-slate-950 text-white antialiased`}>
-        <Web3Provider>
+        <ClientProviders>
           <Navbar />
           <main className="min-h-screen pt-16">{children}</main>
-        </Web3Provider>
+        </ClientProviders>
       </body>
     </html>
   );
