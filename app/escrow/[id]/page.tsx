@@ -7,6 +7,7 @@ import { useToast } from "../../components/Toast";
 import StatusBadge from "../../components/StatusBadge";
 import CountdownTimer from "../../components/CountdownTimer";
 import FileUpload from "../../components/FileUpload";
+import ActivityFeed from "../../components/ActivityFeed";
 import { useSubmitWork, useSubmitMilestone } from "../../hooks/useEscrow";
 import { formatEther } from "viem";
 import { EscrowState, MilestoneState, MILESTONE_LABELS } from "../../config/contracts";
@@ -273,6 +274,17 @@ export default function EscrowDetailPage({
           </div>
         </div>
       )}
+
+      {/* Activity Timeline */}
+      <div className="mb-6">
+        <ActivityFeed
+          state={state}
+          createdAt={escrow.createdAt}
+          milestoneCount={escrow.milestoneCount}
+          milestonesApproved={escrow.milestonesApproved}
+          ipfsHash={escrow.ipfsHash}
+        />
+      </div>
 
       {/* Actions */}
       <div className="space-y-3">
