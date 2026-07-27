@@ -1,222 +1,346 @@
 "use client";
 
-import { useState } from "react";
-import { useParams } from "next/navigation";
+import { use, useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { formatEther } from "viem";
-import {
-  useGetEscrow,
-  useApproveWork,
-  useRaiseDispute,
-} from "../../hooks/useEscrow";
-import TransactionModal from "../../components/TransactionModal";
+import { useGetEscrow, useGetMilestones, useApproveWork, useCancelEscrow, useClaimExpired, useRaiseDispute, useApproveMilestone } from "../../hooks/useEscrow";
+import { useToast } from "../../components/Toast";
 import StatusBadge from "../../components/StatusBadge";
-import NetworkGuard from "../../components/NetworkGuard";
-import { EscrowState } from "../../config/contracts";
+import CountdownTimer from "../../components/CountdownTimer";
+import FileUpload from "../../components/FileUpload";
+import { useSubmitWork, useSubmitMilestone } from "../../hooks/useEscrow";
+import { formatEther } from "viem";
+import { EscrowState, MilestoneState, MILESTONE_LABELS } from "../../config/contracts";
 import {
-  CheckCircle,
-  AlertTriangle,
-  ExternalLink,
+  ArrowLeft,
   User,
-  Briefcase,
-  Lock,
+  Shield,
+  Loader2,
+  ExternalLink,
   Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Layers,
+  FileText,
+  Ban,
 } from "lucide-react";
+import Link from "next/link";
 
-type ModalAction = "approve" | "dispute" | null;
-
-export default function EscrowDetailPage() {
-  const { id } = useParams();
+export default function EscrowDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const escrowId = BigInt(id);
   const { user } = usePrivy();
-  // Get the active wallet address (either external or embedded)
-  const address = user?.wallet?.address as `0x${string}` | undefined;
-  const isEmbeddedWallet =
-    user?.wallet?.walletClientType === "privy" ||
-    user?.wallet?.walletClientType === "coinbase_smart_wallet";
-
-  const escrowId = BigInt(id as string);
+  const address = user?.wallet?.address?.toLowerCase();
+  const { addToast } = useToast();
 
   const { data: escrow, isLoading, refetch } = useGetEscrow(escrowId);
+  const { data: milestones } = useGetMilestones(escrowId);
 
-  const approveHook = useApproveWork();
-  const disputeHook = useRaiseDispute();
+  // Write hooks
+  const approve = useApproveWork();
+  const cancel = useCancelEscrow();
+  const expire = useClaimExpired();
+  const dispute = useRaiseDispute();
+  const submitWork = useSubmitWork();
+  const submitMilestoneHook = useSubmitMilestone();
+  const approveMilestoneHook = useApproveMilestone();
 
-  const [activeModal, setActiveModal] = useState<ModalAction>(null);
+  const [ipfsHash, setIpfsHash] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [milestoneIndex, setMilestoneIndex] = useState<number | null>(null);
+
+  // Toast on success
+  const actions = [
+    { hook: approve, msg: "Work approved! Payment released." },
+    { hook: cancel, msg: "Escrow cancelled. Funds refunded." },
+    { hook: expire, msg: "Expired claim successful. Funds refunded." },
+    { hook: dispute, msg: "Dispute raised." },
+    { hook: submitWork, msg: "Work submitted!" },
+    { hook: submitMilestoneHook, msg: "Milestone submitted!" },
+    { hook: approveMilestoneHook, msg: "Milestone approved! Payment released." },
+  ];
+
+  for (const { hook, msg } of actions) {
+    useEffect(() => {
+      if (hook.isSuccess) {
+        addToast("success", msg);
+        refetch();
+      }
+    }, [hook.isSuccess]);
+
+    useEffect(() => {
+      if (hook.error) addToast("error", hook.error.message?.split("\n")[0] ?? "Transaction failed");
+    }, [hook.error]);
+  }
 
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
       </div>
     );
   }
 
   if (!escrow) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-slate-400">
-        Escrow not found.
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
+        <XCircle className="h-12 w-12 text-red-400" />
+        <p className="text-2xl font-bold text-white">Escrow Not Found</p>
+        <Link href="/dashboard" className="text-sm text-indigo-400 hover:underline">Back to Dashboard</Link>
       </div>
     );
   }
 
-  const isClient = address?.toLowerCase() === escrow.client.toLowerCase();
-  const date = new Date(Number(escrow.createdAt) * 1000).toLocaleString();
-  const shortAddr = (a: string) => `${a.slice(0, 8)}…${a.slice(-6)}`;
+  const isClient = address === escrow.client.toLowerCase();
+  const isFreelancer = address === escrow.freelancer.toLowerCase();
+  const state = escrow.state as EscrowState;
+  const hasMilestones = escrow.milestoneCount > 0n;
+  const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+  const isActive = state === EscrowState.AWAITING_WORK || state === EscrowState.WORK_SUBMITTED;
 
-  const handleApprove = () => {
-    setActiveModal("approve");
-    approveHook.approveWork(escrowId);
+  const handleSubmitWork = () => {
+    if (!ipfsHash) return;
+    submitWork.submitWork(escrowId, ipfsHash);
   };
 
-  const handleDispute = () => {
-    setActiveModal("dispute");
-    disputeHook.raiseDispute(escrowId);
+  const handleSubmitMilestone = (idx: number) => {
+    if (!ipfsHash) return;
+    submitMilestoneHook.submitMilestone(escrowId, BigInt(idx), ipfsHash);
+    setIpfsHash("");
   };
 
-  const closeModal = () => {
-    setActiveModal(null);
-    refetch();
-  };
-
-  const currentHook = activeModal === "approve" ? approveHook : disputeHook;
+  const anyPending = [approve, cancel, expire, dispute, submitWork, submitMilestoneHook, approveMilestoneHook]
+    .some((h) => h.isPending || h.isConfirming);
 
   return (
-    <NetworkGuard>
-    <div className="mx-auto max-w-2xl px-4 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-10">
+      {/* Back */}
+      <Link href="/dashboard" className="mb-6 flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+      </Link>
+
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs text-slate-500 mb-1">Escrow #{id?.toString()}</p>
-          <h1 className="text-2xl font-bold text-white">{escrow.description}</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-sm text-slate-500">Escrow #{id}</p>
+            {hasMilestones && (
+              <span className="flex items-center gap-1 text-[10px] rounded-full px-2 py-0.5 font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                <Layers className="h-2.5 w-2.5" /> Multi-Milestone
+              </span>
+            )}
+          </div>
+          <h1 className="text-xl font-bold text-white">{escrow.description}</h1>
         </div>
-        <StatusBadge state={escrow.state} />
+        <StatusBadge state={state} />
       </div>
 
-      {/* Details card */}
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-slate-500 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-500">Client</p>
-              <p className="font-mono text-xs text-white">
-                {shortAddr(escrow.client)}
-                {isClient && (
-                  <span className="ml-1 rounded bg-indigo-600/20 px-1 text-[10px] text-indigo-400">
-                    You
-                  </span>
-                )}
-              </p>
-            </div>
+      {/* Info Grid */}
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center gap-2 mb-2 text-xs text-slate-500">
+            <User className="h-3 w-3" /> Client
           </div>
-          <div className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-slate-500 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-500">Freelancer</p>
-              <p className="font-mono text-xs text-white">
-                {shortAddr(escrow.freelancer)}
-                {address?.toLowerCase() === escrow.freelancer.toLowerCase() && (
-                  <span className="ml-1 rounded bg-indigo-600/20 px-1 text-[10px] text-indigo-400">
-                    You
-                  </span>
-                )}
-              </p>
-            </div>
+          <p className="font-mono text-sm text-white">{shortAddr(escrow.client)}</p>
+          {isClient && <p className="text-[10px] text-indigo-400 mt-1">You</p>}
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center gap-2 mb-2 text-xs text-slate-500">
+            <Shield className="h-3 w-3" /> Freelancer
           </div>
-          <div className="flex items-center gap-2">
-            <Lock className="h-4 w-4 text-slate-500 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-500">{isEmbeddedWallet ? "Payment" : "Locked"}</p>
-              <p className="text-sm font-bold text-white">
-                {parseFloat(formatEther(escrow.amount)).toFixed(4)} MATIC
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-slate-500 shrink-0" />
-            <div>
-              <p className="text-xs text-slate-500">Created</p>
-              <p className="text-xs text-white">{date}</p>
-            </div>
-          </div>
+          <p className="font-mono text-sm text-white">{shortAddr(escrow.freelancer)}</p>
+          {isFreelancer && <p className="text-[10px] text-emerald-400 mt-1">You</p>}
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <p className="text-xs text-slate-500 mb-2">Amount Locked</p>
+          <p className="text-xl font-bold text-white">{parseFloat(formatEther(escrow.amount)).toFixed(4)} <span className="text-sm text-slate-400">MATIC</span></p>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <p className="text-xs text-slate-500 mb-2">Deadline</p>
+          {isActive ? (
+            <CountdownTimer deadline={escrow.deadline} />
+          ) : (
+            <p className="text-sm text-slate-400">{new Date(Number(escrow.deadline) * 1000).toLocaleDateString()}</p>
+          )}
         </div>
       </div>
 
-      {/* IPFS proof */}
+      {/* IPFS Proof */}
       {escrow.ipfsHash && (
-        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-400">
-            Work Proof (IPFS)
-          </p>
-          <p className="break-all font-mono text-xs text-slate-300">
-            {escrow.ipfsHash}
-          </p>
-          <a
-            href={`https://ipfs.io/ipfs/${escrow.ipfsHash}`}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 underline"
-          >
-            View on IPFS Gateway <ExternalLink className="h-3 w-3" />
-          </a>
+        <div className="mb-6 rounded-xl border border-white/10 bg-white/5 p-4">
+          <p className="text-xs text-slate-500 mb-2 flex items-center gap-1.5"><FileText className="h-3 w-3" /> Proof of Work (IPFS)</p>
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-xs text-slate-300 truncate flex-1">{escrow.ipfsHash}</p>
+            <a
+              href={`https://gateway.pinata.cloud/ipfs/${escrow.ipfsHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 flex items-center gap-1 text-xs text-indigo-400 hover:underline"
+            >
+              View <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
         </div>
       )}
 
-      {/* Client actions */}
-      {isClient && escrow.state === EscrowState.WORK_SUBMITTED && (
-        <div className="flex gap-3">
-          <button
-            onClick={handleApprove}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition-colors"
-          >
-            <CheckCircle className="h-4 w-4" /> Approve &amp; Release Funds
-          </button>
-          <button
-            onClick={handleDispute}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition-colors"
-          >
-            <AlertTriangle className="h-4 w-4" /> Raise Dispute
-          </button>
+      {/* Milestones Section */}
+      {hasMilestones && milestones && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-widest text-slate-400">Milestones</h2>
+          <div className="space-y-3">
+            {(milestones as unknown as { description: string; amount: bigint; ipfsHash: string; state: number }[]).map((m, i) => {
+              const ms = m.state as MilestoneState;
+              return (
+                <div key={i} className={`rounded-xl border p-4 ${
+                  ms === MilestoneState.APPROVED ? "border-emerald-500/20 bg-emerald-500/5" :
+                  ms === MilestoneState.SUBMITTED ? "border-blue-500/20 bg-blue-500/5" :
+                  "border-white/10 bg-white/5"
+                }`}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <p className="text-xs text-slate-500">Phase {i + 1}</p>
+                      <p className="text-sm font-medium text-white">{m.description}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-white">{parseFloat(formatEther(m.amount)).toFixed(4)} MATIC</p>
+                      <p className={`text-[10px] font-medium mt-0.5 ${
+                        ms === MilestoneState.APPROVED ? "text-emerald-400" :
+                        ms === MilestoneState.SUBMITTED ? "text-blue-400" :
+                        "text-slate-500"
+                      }`}>{MILESTONE_LABELS[ms]}</p>
+                    </div>
+                  </div>
+
+                  {/* Milestone IPFS */}
+                  {m.ipfsHash && (
+                    <a
+                      href={`https://gateway.pinata.cloud/ipfs/${m.ipfsHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-400 hover:underline font-mono"
+                    >
+                      View proof ↗
+                    </a>
+                  )}
+
+                  {/* Freelancer: Submit this milestone */}
+                  {isFreelancer && ms === MilestoneState.PENDING && isActive && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                      {milestoneIndex === i ? (
+                        <div className="space-y-2">
+                          <FileUpload onUpload={(hash) => setIpfsHash(hash)} isUploading={isUploading} setIsUploading={setIsUploading} />
+                          {ipfsHash && (
+                            <button
+                              onClick={() => handleSubmitMilestone(i)}
+                              disabled={submitMilestoneHook.isPending}
+                              className="w-full rounded-lg bg-indigo-600 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                            >
+                              {submitMilestoneHook.isPending ? "Submitting…" : `Submit Phase ${i + 1}`}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setMilestoneIndex(i)}
+                          className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                        >
+                          Upload proof for this phase →
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Client: Approve this milestone */}
+                  {isClient && ms === MilestoneState.SUBMITTED && (
+                    <button
+                      onClick={() => approveMilestoneHook.approveMilestone(escrowId, BigInt(i))}
+                      disabled={approveMilestoneHook.isPending}
+                      className="mt-3 w-full rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      {approveMilestoneHook.isPending ? "Approving…" : `Approve & Release Phase ${i + 1}`}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Freelancer can also raise dispute */}
-      {address?.toLowerCase() === escrow.freelancer.toLowerCase() &&
-        (escrow.state === EscrowState.AWAITING_WORK ||
-          escrow.state === EscrowState.WORK_SUBMITTED) && (
+      {/* Actions */}
+      <div className="space-y-3">
+        {/* Freelancer: Submit Work (single-milestone) */}
+        {isFreelancer && !hasMilestones && state === EscrowState.AWAITING_WORK && (
+          <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+            <h3 className="mb-3 text-sm font-semibold text-white">Submit Your Work</h3>
+            <FileUpload onUpload={(hash) => setIpfsHash(hash)} isUploading={isUploading} setIsUploading={setIsUploading} />
+            {ipfsHash && (
+              <button
+                onClick={handleSubmitWork}
+                disabled={submitWork.isPending}
+                className="mt-3 w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {submitWork.isPending ? "Submitting…" : "Submit Work on Chain"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Client: Approve (single-milestone) */}
+        {isClient && !hasMilestones && state === EscrowState.WORK_SUBMITTED && (
           <button
-            onClick={handleDispute}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-500/10 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/20 transition-colors"
+            onClick={() => approve.approveWork(escrowId)}
+            disabled={anyPending}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            <AlertTriangle className="h-4 w-4" /> Raise Dispute
+            {approve.isPending || approve.isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+            Approve & Release Payment
           </button>
         )}
 
-      {/* Completed / Refunded states */}
-      {(escrow.state === EscrowState.COMPLETE ||
-        escrow.state === EscrowState.REFUNDED) && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-400">
-          This escrow is{" "}
-          {escrow.state === EscrowState.COMPLETE ? "complete" : "refunded"}.
-        </div>
-      )}
+        {/* Client: Cancel */}
+        {isClient && state === EscrowState.AWAITING_WORK && (
+          <button
+            onClick={() => cancel.cancelEscrow(escrowId)}
+            disabled={anyPending}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 py-3 text-sm font-semibold text-white hover:bg-white/5 disabled:opacity-50"
+          >
+            {cancel.isPending || cancel.isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
+            Cancel Escrow (Full Refund)
+          </button>
+        )}
 
-      {/* Modal */}
-      <TransactionModal
-        open={activeModal !== null}
-        onClose={closeModal}
-        isPending={currentHook.isPending}
-        isConfirming={currentHook.isConfirming}
-        isSuccess={currentHook.isSuccess}
-        error={currentHook.error}
-        hash={currentHook.hash}
-        successMessage={
-          activeModal === "approve"
-            ? "Work approved! Funds sent to freelancer."
-            : "Dispute raised. Owner will arbitrate."
-        }
-      />
+        {/* Client: Claim Expired */}
+        {isClient && state === EscrowState.AWAITING_WORK && Number(escrow.deadline) * 1000 < Date.now() && (
+          <button
+            onClick={() => expire.claimExpired(escrowId)}
+            disabled={anyPending}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-600 py-3 text-sm font-semibold text-white hover:bg-yellow-500 disabled:opacity-50"
+          >
+            {expire.isPending || expire.isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />}
+            Claim Expired (Refund)
+          </button>
+        )}
+
+        {/* Dispute */}
+        {(isClient || isFreelancer) && isActive && (
+          <button
+            onClick={() => dispute.raiseDispute(escrowId)}
+            disabled={anyPending}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+          >
+            {dispute.isPending || dispute.isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+            Raise Dispute
+          </button>
+        )}
+      </div>
     </div>
-    </NetworkGuard>
   );
 }

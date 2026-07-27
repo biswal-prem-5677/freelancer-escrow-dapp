@@ -10,6 +10,7 @@ const colorMap: Record<string, string> = {
   green: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   red: "bg-red-500/10 text-red-400 border-red-500/20",
   gray: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+  slate: "bg-slate-500/10 text-slate-500 border-slate-500/20",
 };
 
 const dotColorMap: Record<string, string> = {
@@ -18,6 +19,7 @@ const dotColorMap: Record<string, string> = {
   green: "bg-emerald-400",
   red: "bg-red-400",
   gray: "bg-slate-400",
+  slate: "bg-slate-500",
 };
 
 export default function StatusBadge({ state }: StatusBadgeProps) {

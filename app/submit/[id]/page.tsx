@@ -94,6 +94,20 @@ export default function SubmitWorkPage() {
               isUploading={isUploading}
               setIsUploading={setIsUploading}
             />
+
+            {/* Fallback: paste hash manually */}
+            <div className="mt-3">
+              <p className="mb-1.5 text-xs text-slate-500">
+                — or paste an IPFS hash directly —
+              </p>
+              <input
+                type="text"
+                placeholder="QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco"
+                value={ipfsHash ?? ""}
+                onChange={(e) => setIpfsHash(e.target.value || null)}
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-xs text-white font-mono placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
           </div>
 
           {ipfsHash && (

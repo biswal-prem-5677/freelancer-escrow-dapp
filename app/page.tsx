@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { Shield, ArrowRight, Lock, FileCheck, CheckCircle } from "lucide-react";
+import { Shield, ArrowRight, Lock, FileCheck, CheckCircle, BarChart3, Layers, Clock, Zap, Github, ExternalLink } from "lucide-react";
+import { usePlatformStats } from "./hooks/useEscrow";
+import Footer from "./components/Footer";
 
 const steps = [
   {
@@ -19,7 +23,32 @@ const steps = [
   },
 ];
 
+const features = [
+  {
+    icon: Layers,
+    title: "Multi-Milestone",
+    desc: "Split projects into phases. Pay freelancers as each deliverable is approved.",
+  },
+  {
+    icon: Clock,
+    title: "Auto-Expiry",
+    desc: "Set deadlines. If work isn't delivered, clients get automatic refunds.",
+  },
+  {
+    icon: Shield,
+    title: "Dispute Resolution",
+    desc: "On-chain arbitration by platform admin. Fair, transparent, immutable.",
+  },
+  {
+    icon: Zap,
+    title: "Instant Settlement",
+    desc: "Polygon's fast finality means payments clear in seconds, not days.",
+  },
+];
+
 export default function HomePage() {
+  const { totalEscrows, platformFeeBps } = usePlatformStats();
+
   return (
     <div className="relative overflow-hidden">
       {/* Ambient background glows */}
@@ -72,6 +101,24 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Live Platform Stats */}
+      <section className="mx-auto max-w-3xl px-4 pb-20">
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur hover:bg-white/[0.07] transition-colors">
+            <p className="text-3xl font-bold text-white">{totalEscrows?.toString() ?? "—"}</p>
+            <p className="mt-1 text-xs text-slate-500">Escrows Created</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur hover:bg-white/[0.07] transition-colors">
+            <p className="text-3xl font-bold text-white">{platformFeeBps !== undefined ? `${Number(platformFeeBps) / 100}%` : "—"}</p>
+            <p className="mt-1 text-xs text-slate-500">Platform Fee</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur hover:bg-white/[0.07] transition-colors">
+            <p className="text-3xl font-bold text-white">~2s</p>
+            <p className="mt-1 text-xs text-slate-500">Settlement Time</p>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works */}
       <section className="mx-auto max-w-5xl px-4 pb-28">
         <div className="mb-4 text-center">
@@ -108,6 +155,66 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* V2 Features */}
+      <section className="mx-auto max-w-5xl px-4 pb-28">
+        <div className="mb-4 text-center">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-emerald-400">
+            V2 Features
+          </p>
+          <h2 className="text-2xl font-bold text-white">Built for Real Projects</h2>
+        </div>
+
+        <div className="mt-10 grid gap-6 sm:grid-cols-2">
+          {features.map((f, i) => (
+            <div
+              key={i}
+              className="group rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur transition-all duration-300 hover:border-white/20 hover:bg-white/[0.07]"
+            >
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 group-hover:bg-indigo-600/20 transition-colors">
+                <f.icon className="h-5 w-5 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+              </div>
+              <h3 className="mb-1 text-base font-semibold text-white">{f.title}</h3>
+              <p className="text-sm text-slate-400 leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Trust Indicators */}
+      <section className="mx-auto max-w-3xl px-4 pb-20">
+        <div className="flex flex-wrap justify-center gap-3">
+          <a
+            href="https://amoy.polygonscan.com/address/0x493cb97D92477CB87Ef5117a6D8E42c0e08CfaAB"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+          >
+            <CheckCircle className="h-3.5 w-3.5" />
+            Contract Verified
+            <ExternalLink className="h-3 w-3" />
+          </a>
+          <a
+            href="https://github.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-white/10 transition-colors"
+          >
+            <Github className="h-3.5 w-3.5" />
+            Open Source
+          </a>
+          <span className="flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/5 px-4 py-2 text-xs font-medium text-indigo-400">
+            <Shield className="h-3.5 w-3.5" />
+            76 Tests Passing
+          </span>
+          <span className="flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/5 px-4 py-2 text-xs font-medium text-violet-400">
+            <Zap className="h-3.5 w-3.5" />
+            ERC-4337 Compatible
+          </span>
+        </div>
+      </section>
+
+      <Footer />
 
       {/* Animated gradient keyframes injected inline */}
       <style>{`

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useReadContract, useChainId } from "wagmi";
 import { CONTRACT_ADDRESSES, ESCROW_ABI } from "../config/contracts";
-import { Shield, Menu, X, ShieldAlert } from "lucide-react";
+import { Shield, Menu, X, ShieldAlert, BarChart3, User } from "lucide-react";
 
 export default function Navbar() {
   const { login, logout, authenticated, ready, user } = usePrivy();
@@ -30,7 +30,12 @@ export default function Navbar() {
   const navLinks = [
     { href: "/", label: "Home" },
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/stats", label: "Stats" },
   ];
+
+  const authLinks = authenticated
+    ? [{ href: "/profile", label: "Profile", icon: User }]
+    : [];
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
@@ -53,6 +58,16 @@ export default function Navbar() {
               href={link.href}
               className="text-sm text-slate-400 hover:text-white transition-colors"
             >
+              {link.label}
+            </Link>
+          ))}
+          {authLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              <link.icon className="h-3.5 w-3.5" />
               {link.label}
             </Link>
           ))}
@@ -126,7 +141,7 @@ export default function Navbar() {
 
       {/* Mobile Dropdown Menu */}
       {menuOpen && (
-        <div className="border-t border-white/10 bg-slate-950/95 px-4 py-4 md:hidden">
+        <div className="border-t border-white/10 bg-slate-950/95 px-4 py-4 md:hidden animate-slide-in-down">
           <div className="flex flex-col gap-1">
             {navLinks.map((link) => (
               <Link
@@ -135,6 +150,17 @@ export default function Navbar() {
                 onClick={() => setMenuOpen(false)}
                 className="rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
               >
+                {link.label}
+              </Link>
+            ))}
+            {authLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
+              >
+                <link.icon className="h-4 w-4" />
                 {link.label}
               </Link>
             ))}
