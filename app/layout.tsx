@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "./components/Navbar";
 import ClientProviders from "./providers/ClientProviders";
 import { ToastProvider } from "./components/Toast";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -51,7 +52,9 @@ export default function RootLayout({
         <ClientProviders>
           <ToastProvider>
             <Navbar />
-            <main className="min-h-screen pt-16">{children}</main>
+            <ErrorBoundary>
+              <main className="min-h-screen pt-16">{children}</main>
+            </ErrorBoundary>
           </ToastProvider>
         </ClientProviders>
       </body>
