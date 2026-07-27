@@ -7,6 +7,7 @@ import { useGetClientEscrows, useGetFreelancerEscrows, useGetEscrow } from "../h
 import EscrowCard from "../components/EscrowCard";
 import SearchFilter from "../components/SearchFilter";
 import EmptyState from "../components/EmptyState";
+import SkeletonCard from "../components/SkeletonCard";
 import { Plus, Briefcase, LayoutDashboard } from "lucide-react";
 import { EscrowState } from "../config/contracts";
 
@@ -26,7 +27,7 @@ function EscrowCardLoader({
 
   if (isLoading) {
     return (
-      <div className="h-44 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+      <SkeletonCard />
     );
   }
   if (!data) return null;
