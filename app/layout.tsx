@@ -29,12 +29,21 @@ export const metadata: Metadata = {
       "Lock funds, submit proof, get paid. Decentralized escrow on Polygon with IPFS proof-of-work.",
     type: "website",
     siteName: "FreelancerEscrow",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "FreelancerEscrow — Trustless Freelance Payments on Polygon",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "FreelancerEscrow — Trustless Web3 Payments",
     description:
       "Lock funds, submit proof, get paid. Decentralized escrow on Polygon with IPFS proof-of-work.",
+    images: ["/og-image.png"],
   },
 };
 
